@@ -1,0 +1,1 @@
+import {Router} from 'express';import {protect} from '../middleware/authMiddleware.js';import {list,upsert,remove} from '../controllers/budgetController.js';const r=Router();r.use(protect);r.get('/',list);r.post('/',upsert);r.delete('/:id',remove);export default r;

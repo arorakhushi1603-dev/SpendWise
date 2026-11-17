@@ -1,0 +1,11 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
+import {asyncHandler} from '../utils/asyncHandler.js';
+import {accessToken,refreshToken,setRefreshCookie} from '../utils/tokens.js';
+const publicUser=u=>({_id:u._id,name:u.name,email:u.email,role:u.role});
+export const register=asyncHandler(async(req,res)=>{const {name,email,password}=req.body;if(!name||!email||!password||password.length<8)return res.status(400).json({message:'Name, valid email and password (8+ characters) are required'});if(await User.findOne({email}))return res.status(409).json({message:'Email already registered'});const user=await User.create({name,email,password:await bcrypt.hash(password,12)});const rt=refreshToken(user);setRefreshCookie(res,rt);res.status(201).json({user:publicUser(user),accessToken:accessToken(user)});});
+export const login=asyncHandler(async(req,res)=>{const {email,password}=req.body;const user=await User.findOne({email}).select('+password');if(!user||!await bcrypt.compare(password||'',user.password))return res.status(401).json({message:'Incorrect email or password'});setRefreshCookie(res,refreshToken(user));res.json({user:publicUser(user),accessToken:accessToken(user)});});
+export const refresh=asyncHandler(async(req,res)=>{const token=req.cookies.refreshToken;if(!token)return res.status(401).json({message:'Refresh token missing'});const decoded=jwt.verify(token,process.env.JWT_REFRESH_SECRET);const user=await User.findById(decoded.id);if(!user||user.tokenVersion!==decoded.tokenVersion)return res.status(401).json({message:'Refresh token revoked'});setRefreshCookie(res,refreshToken(user));res.json({accessToken:accessToken(user),user:publicUser(user)});});
+export const logout=asyncHandler(async(req,res)=>{if(req.cookies.refreshToken){try{const d=jwt.verify(req.cookies.refreshToken,process.env.JWT_REFRESH_SECRET);await User.findByIdAndUpdate(d.id,{$inc:{tokenVersion:1}});}catch{}}res.clearCookie('refreshToken',{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict'});res.json({message:'Logged out'});});
+export const me=asyncHandler(async(req,res)=>res.json({user:publicUser(req.user)}));

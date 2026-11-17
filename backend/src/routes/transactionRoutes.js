@@ -1,0 +1,1 @@
+import {Router} from 'express';import {protect} from '../middleware/authMiddleware.js';import {list,create,update,remove,summary} from '../controllers/transactionController.js';const r=Router();r.use(protect);r.get('/summary',summary);r.route('/').get(list).post(create);r.route('/:id').put(update).delete(remove);export default r;
